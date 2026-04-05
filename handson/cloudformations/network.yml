@@ -1,0 +1,144 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Network resource template
+Resources:
+  # VPCの設定
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InsatanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: sbcntr-main
+
+  ############### Subnet, RouteTable, IGW ###############
+  # コンテナ周りの設定
+  ## コンテナアプリ用のプライベートサブネット
+  SubnetPrivateAppA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.8.0/24
+      VpcId:
+        Ref: Vpc
+      AvailabilityZone: 
+        Fn:Select:
+          - 0
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: sbcntr-private-app-a
+        - Key: Type
+          Value: Isolated
+  SubnetPrivateAppC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.9.0/24
+      VpcId:
+        Ref: Vpc
+      AvailabilityZone: 
+        Fn:Select:
+          - 1
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: sbcntr-private-app-c
+        - Key: Type
+          Value: Isolated
+  ## コンテナアプリ用のルートテーブル
+  RouteApp:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: Vpc
+      Tags:
+        - Key: Name
+          Value: sbcntr-app
+  ## コンテナサブネットへルート紐付け
+  RouteAppAssociationA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: RouteApp
+      SubnetId:
+        Ref: SubnetPrivateAppA
+  RouteAppAssociationC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: RouteApp
+      SubnetId:
+        Ref: SubnetPrivateAppC
+    
+  # DB周りの設定
+  ## DB用のプライベートサブネット
+  SubnetPrivateDbA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.16.0/24
+      VpcId:
+        Ref: Vpc
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: sbcntr-private-db-a
+        - Key: Type
+          Value: Isolated
+  SubnetPrivateDbC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.17.0/24
+      VpcId:
+        Ref: Vpc
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: sbcntr-private-db-c
+        - Key: Type
+          Value: Isolated
+
+  # Ingress周りの設定
+  ## Ingress用のパブリックサブネット
+  SubnetPublicIngressA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.0.0/24
+      VpcId:
+        Ref: Vpc
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: sbcntr-public-ingress-a
+        - Key: Type
+          Value: Public
+  SubnetPublicIngressC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.1.0/24
+      VpcId:
+        Ref: Vpc
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: sbcntr-public-ingress-a
+        - Key: Type
+          Value: Public
