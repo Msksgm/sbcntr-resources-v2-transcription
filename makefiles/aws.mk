@@ -8,19 +8,19 @@ aws.status: ## AWSのインスタンス状態とCFnスタック一覧
 ################################################################################
 # CFnスタック作成と削除
 ################################################################################
-.PHONY: aws.create-cfn
-aws.create-cfn: ## AWSのCFnスタックを作成
-	@aws cloudformation create-stack --stack-name ${STACK_NAME} --template-body file://handson/cloudformations/network.yml
-	@echo "${STACK_NAME}: 作成中です（約1分かかる）"
-	@time aws cloudformation wait stack-create-complete --stack-name ${STACK_NAME}
+.PHONY: aws.create-base-cfn
+aws.create-base-cfn: ## AWSのbase CFnスタックを作成
+	@aws cloudformation create-stack --stack-name ${BASE_STACK_NAME} --template-body file://handson/cloudformations/network.yml
+	@echo "${BASE_STACK_NAME}: 作成中です（約1分かかる）"
+	@time aws cloudformation wait stack-create-complete --stack-name ${BASE_STACK_NAME}
 
-.PHONY: aws.delete-cfn
-aws.delete-cfn: ## AWSのCFnスタック削除
+.PHONY: aws.delete-base-cfn
+aws.delete-base-cfn: ## AWSの base CFnスタック削除
 	@echo 'Before status'
 	@make aws.status
-	@aws cloudformation delete-stack --stack-name $(STACK_NAME)
+	@aws cloudformation delete-stack --stack-name $(BASE_STACK_NAME)
 	@echo '削除中です'
-	@time aws cloudformation wait stack-delete-complete --stack-name $(STACK_NAME)
+	@time aws cloudformation wait stack-delete-complete --stack-name $(BASE_STACK_NAME)
 	@echo 'After status'
 	@make aws.status
 
