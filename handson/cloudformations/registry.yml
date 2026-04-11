@@ -6,6 +6,7 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       RepositoryName: sbcntr-backend-app
+      EmptyOnDelete: true
       ImageTagMutability: MUTABLE
       EncryptionConfiguration:
         EncryptionType: AES256
@@ -14,6 +15,7 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       RepositoryName: sbcntr-frontend-app
+      EmptyOnDelete: true
       ImageTagMutability: MUTABLE
       EncryptionConfiguration:
         EncryptionType: AES256
