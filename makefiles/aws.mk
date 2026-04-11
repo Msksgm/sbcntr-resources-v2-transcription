@@ -49,6 +49,22 @@ aws.delete-pseudo-cloud9-cfn: ## AWSの擬似 cloud9 CFnスタックを削除
 	@echo 'After status'
 	@make aws.status
 
+.PHONY: aws.create-registry-cfn
+aws.create-registry-cfn: ## AWSのRegistryスタックを作成
+	@aws cloudformation create-stack --stack-name ${REGISTRY_STACK_NAME} --template-body file://handson/cloudformations/registry.yml
+	@echo "${REGISTRY_STACK_NAME}: 作成中です（約1分かかる）"
+	@time aws cloudformation wait stack-create-complete --stack-name ${REGISTRY_STACK_NAME}
+
+.PHONY: aws.delete-registry-cfn
+aws.delete-registry-cfn: ## AWSのRegistryスタックを削除
+	@echo 'Before status'
+	@make aws.status
+	@aws cloudformation delete-stack --stack-name $(REGISTRY_STACK_NAME)
+	@echo '削除中です'
+	@time aws cloudformation wait stack-delete-complete --stack-name $(REGISTRY_STACK_NAME)
+	@echo 'After status'
+	@make aws.status
+
 .PHONY: aws.show-defined-pseudo-cloud9-variables
 aws.show-defined-pseudo-cloud9-variables: aws.define-pseudo-cloud9-variables ## 擬似 cloud9 CFnスタック作成に必要な環境変数を定義
 	@echo "VPC_ID:     $(VPC_ID)"
