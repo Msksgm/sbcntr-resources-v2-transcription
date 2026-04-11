@@ -65,11 +65,40 @@ aws.delete-registry-cfn: ## AWSのRegistryスタックを削除
 	@echo 'After status'
 	@make aws.status
 
+.PHONY: aws.create-network-vpc-endpoint-step1-cfn
+aws.create-network-vpc-endpoint-step1-cfn: aws.define-network-vpc-endpoints-step1-variables ## ECRへのネットワーク経路となる、VPCエンドポイントを作成
+	@aws cloudformation create-stack --stack-name ${NETWORK_VPC_ENDPOINT_STEP1_STACK_NAME} --template-body file://handson/cloudformations/network_vpc_endpoint_step1.yml \
+		--parameters \
+			ParameterKey=VpcId,ParameterValue=$(VPC_ID) \
+			'ParameterKey=SubnetIds,ParameterValue="$(SUBNET_IDS)"' \
+			ParameterKey=SecurityGroupIds,ParameterValue=$(SG_ID) \
+			ParameterKey=RouteTableId,ParameterValue=$(ROUTE_TABLE_ID)
+
+	@echo "${NETWORK_VPC_ENDPOINT_STEP1_STACK_NAME}: 作成中です（約1.5分かかる）"
+	@time aws cloudformation wait stack-create-complete --stack-name ${NETWORK_VPC_ENDPOINT_STEP1_STACK_NAME}
+
+.PHONY: aws.delete-network-vpc-endpoint-step1-cfn
+aws.delete-network-vpc-endpoint-step1-cfn: ## ECRへのネットワーク経路となる、VPCエンドポイントを作成
+	@echo 'Before status'
+	@make aws.status
+	@aws cloudformation delete-stack --stack-name $(NETWORK_VPC_ENDPOINT_STEP1_STACK_NAME)
+	@echo '削除中です'
+	@time aws cloudformation wait stack-delete-complete --stack-name $(NETWORK_VPC_ENDPOINT_STEP1_STACK_NAME)
+	@echo 'After status'
+	@make aws.status
+
 .PHONY: aws.show-defined-pseudo-cloud9-variables
 aws.show-defined-pseudo-cloud9-variables: aws.define-pseudo-cloud9-variables ## 擬似 cloud9 CFnスタック作成に必要な環境変数を定義
 	@echo "VPC_ID:     $(VPC_ID)"
 	@echo "SG_ID:      $(SG_ID)"
 	@echo "SUBNET_ID:  $(SUBNET_ID)"
+
+.PHONY: aws.show-defined-network-vpc-endpoints-step1-variables
+aws.show-defined-network-vpc-endpoints-step1-variables: aws.define-network-vpc-endpoints-step1-variables ## ECRへのネットワーク経路となる、VPCエンドポイントを作成するための環境変数
+	@echo "VPC_ID:               $(VPC_ID)"
+	@echo "SG_ID:                $(SG_ID)"
+	@echo "SUBNET_IDS:           $(SUBNET_IDS)"
+	@echo "ROUTE_TABLE_ID:       $(ROUTE_TABLE_ID)"
 
 ###############################################################################
 # SSHの設定
@@ -87,6 +116,12 @@ aws.define-pseudo-cloud9-variables:
 	$(eval VPC_ID     := $(shell aws ec2 describe-vpcs --filters "Name=tag:Name,Values=sbcntr-main" --query "Vpcs[0].VpcId" --output text))
 	$(eval SG_ID      := $(shell aws ec2 describe-security-groups --filters "Name=group-name,Values=management" "Name=vpc-id,Values=${VPC_ID}" --query "SecurityGroups[0].GroupId" --output text))
 	$(eval SUBNET_ID  := $(shell aws ec2 describe-subnets --filters "Name=tag:Name,Values=sbcntr-public-management-a" --query "Subnets[0].SubnetId" --output text))
+
+aws.define-network-vpc-endpoints-step1-variables:
+	$(eval VPC_ID               := $(shell aws ec2 describe-vpcs --filters "Name=tag:Name,Values=sbcntr-main" --query "Vpcs[0].VpcId" --output text))
+	$(eval SUBNET_IDS           := $(shell aws ec2 describe-subnets --filters "Name=tag:Name,Values=sbcntr-private-egress-*" --query "Subnets[].SubnetId" --output text | tr '\t' ','))
+	$(eval SG_ID                := $(shell aws ec2 describe-security-groups --filters "Name=group-name,Values=egress" "Name=vpc-id,Values=${VPC_ID}" --query "SecurityGroups[0].GroupId" --output text))
+	$(eval ROUTE_TABLE_ID       := $(shell aws ec2 describe-route-tables --filters "Name=tag:Name,Values=sbcntr-app" --query "RouteTables[0].RouteTableId" --output text))
 
 # SSH秘密鍵の検証
 # SSH_PRIVATE_KEY_PATHが指す秘密鍵の公開鍵がGitHubアカウントに登録されているか確認
