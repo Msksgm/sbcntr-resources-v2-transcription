@@ -183,7 +183,7 @@ Resources:
       - sbcntrVpcgwAttachment
 
   # 管理用サーバ周りの設定
-  ## 管理用のプライベートサブネット
+  ## 管理用のパブリックサブネット
   SubnetPublicManagementA:
     Type: AWS::EC2::Subnet
     Properties:
