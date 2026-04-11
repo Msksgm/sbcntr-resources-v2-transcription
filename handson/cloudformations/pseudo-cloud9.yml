@@ -12,6 +12,9 @@ Parameters:
   ManagementSubnetId:
     Description : Input 'management' Subnet ID for ap-northeast-1c
     Type : AWS::EC2::Subnet::Id
+  GitHubUserName:
+    Description: "GitHub Username for SSH public key"
+    Type: String
 
 ################# Resources ###############
 Resources:
@@ -86,6 +89,12 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           
+          GITHUB_USERNAME=${GitHubUserName}
+          mkdir -p /home/ec2-user/.ssh
+          curl -s https://github.com/$GITHUB_USERNAME.keys >> /home/ec2-user/.ssh/authorized_keys
+          chown -R ec2-user:ec2-user /home/ec2-user/.ssh
+          chmod 600 /home/ec2-user/.ssh/authorized_keys
+
           # k6スクリプトを作成
           cat > /home/ec2-user/load-test.js << 'EOF'
           import http from 'k6/http';

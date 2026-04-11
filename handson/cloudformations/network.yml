@@ -1,5 +1,9 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: Network resource template
+Parameters:
+  MyIp:
+    Description: "MyIp for access. curl -fsS https://checkip.amazonaws.com | tr -d '\r\n'"
+    Type: String
 Resources:
   # VPCの設定
   Vpc:
@@ -341,6 +345,18 @@ Resources:
           Value: sbcntr-management
       VpcId:
         Ref: Vpc
+  SgmanagementFromSshTcp:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      IpProtocol: tcp
+      Description: SSH
+      FromPort: 22
+      ToPort: 22
+      GroupId:
+        Fn::GetAtt:
+          - SgManagement
+          - GroupId
+      CidrIp: !Sub "${MyIp}/32"
   ## バックエンドコンテナアプリ用セキュリティグループの生成
   SgBackendApp:
     Type: AWS::EC2::SecurityGroup
