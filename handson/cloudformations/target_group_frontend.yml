@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Target Group for frontend application (blue)"
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: "ID of the target VPC"
+
+Resources:
+  FrontappBlueTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: sbcntr-frontapp-blue
+      TargetType: ip
+      Protocol: HTTP
+      Port: 8080
+      IpAddressType: ipv4
+      VpcId: !Ref VpcId
+      ProtocolVersion: HTTP1
+      HealthCheckPath: /healthcheck
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 2
+      HealthCheckTimeoutSeconds: 5
+      HealthCheckIntervalSeconds: 15
+      Matcher:
+        HttpCode: "200"
+  FrontappGreenTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: sbcntr-frontapp-green
+      TargetType: ip
+      Protocol: HTTP
+      Port: 8080
+      IpAddressType: ipv4
+      VpcId: !Ref VpcId
+      ProtocolVersion: HTTP1
+      HealthCheckPath: /healthcheck
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 2
+      HealthCheckTimeoutSeconds: 5
+      HealthCheckIntervalSeconds: 15
+      Matcher:
+        HttpCode: "200"

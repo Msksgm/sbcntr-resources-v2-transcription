@@ -109,15 +109,36 @@ aws.delete-network-vpc-endpoint-step2-cfn: ## S3、ECR、DKR、ECR API、CloudWa
 	@echo 'After status'
 	@make aws.status
 
+.PHONY: aws.create-target-group-frontend-cfn
+aws.create-target-group-frontend-cfn: aws.define-target-group-frontend-variables ## フロントエンドアプリのターゲットグループを作成
+	@aws cloudformation create-stack --stack-name ${TARGET_GROUP_FRONTEND_STACK_NAME} --template-body file://handson/cloudformations/target_group_frontend.yml \
+		--parameters \
+			ParameterKey=VpcId,ParameterValue=$(VPC_ID)
+
+	@echo "${TARGET_GROUP_FRONTEND_STACK_NAME}: 作成中です（約1分かかる）"
+	@time aws cloudformation wait stack-create-complete --stack-name ${TARGET_GROUP_FRONTEND_STACK_NAME}
+
+.PHONY: aws.delete-target-group-frontend-cfn
+aws.delete-target-group-frontend-cfn: ## フロントエンドアプリのターゲットグループを削除
+	@echo 'Before status'
+	@make aws.status
+	@aws cloudformation delete-stack --stack-name $(TARGET_GROUP_FRONTEND_STACK_NAME)
+	@echo '削除中です'
+	@time aws cloudformation wait stack-delete-complete --stack-name $(TARGET_GROUP_FRONTEND_STACK_NAME)
+	@echo 'After status'
+	@make aws.status
+
 .PHONY: aws.create-all-cfns
 aws.create-all-cfns: ## cfnを作成する
 	@make aws.create-base-cfn
 	@make aws.create-pseudo-cloud9-cfn
 	@make aws.create-registry-cfn
 	@make aws.create-network-vpc-endpoint-step2-cfn
+	@make aws.create-target-group-frontend-cfn
 
 .PHONY: aws.delete-all-cfns
 aws.delete-all-cfns: ## cfnを削除する
+	@make aws.delete-target-group-frontend-cfn
 	@make aws.delete-network-vpc-endpoint-step2-cfn
 	@make aws.delete-registry-cfn
 	@make aws.delete-pseudo-cloud9-cfn
@@ -152,6 +173,9 @@ aws.define-pseudo-cloud9-variables:
 	$(eval VPC_ID     := $(shell aws ec2 describe-vpcs --filters "Name=tag:Name,Values=sbcntr-main" --query "Vpcs[0].VpcId" --output text))
 	$(eval SG_ID      := $(shell aws ec2 describe-security-groups --filters "Name=group-name,Values=management" "Name=vpc-id,Values=${VPC_ID}" --query "SecurityGroups[0].GroupId" --output text))
 	$(eval SUBNET_ID  := $(shell aws ec2 describe-subnets --filters "Name=tag:Name,Values=sbcntr-public-management-a" --query "Subnets[0].SubnetId" --output text))
+
+aws.define-target-group-frontend-variables:
+	$(eval VPC_ID     := $(shell aws ec2 describe-vpcs --filters "Name=tag:Name,Values=sbcntr-main" --query "Vpcs[0].VpcId" --output text))
 
 aws.define-network-vpc-endpoints-variables:
 	$(eval VPC_ID               := $(shell aws ec2 describe-vpcs --filters "Name=tag:Name,Values=sbcntr-main" --query "Vpcs[0].VpcId" --output text))
