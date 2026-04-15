@@ -116,6 +116,13 @@ aws.create-all-cfns: ## cfnを作成する
 	@make aws.create-registry-cfn
 	@make aws.create-network-vpc-endpoint-step2-cfn
 
+.PHONY: aws.delete-all-cfns
+aws.delete-all-cfns: ## cfnを削除する
+	@make aws.delete-network-vpc-endpoint-step2-cfn
+	@make aws.delete-registry-cfn
+	@make aws.delete-pseudo-cloud9-cfn
+	@make aws.delete-base-cfn
+
 .PHONY: aws.show-defined-pseudo-cloud9-variables
 aws.show-defined-pseudo-cloud9-variables: aws.define-pseudo-cloud9-variables ## 擬似 cloud9 CFnスタック作成に必要な環境変数を定義
 	@echo "VPC_ID:     $(VPC_ID)"
