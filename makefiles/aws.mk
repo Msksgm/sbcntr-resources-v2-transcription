@@ -128,6 +128,29 @@ aws.delete-target-group-frontend-cfn: ## フロントエンドアプリのター
 	@echo 'After status'
 	@make aws.status
 
+.PHONY: aws.create-alb-frontend-cfn
+aws.create-alb-frontend-cfn: aws.define-alb-frontend-variables ## フロントエンドアプリのALBを作成
+	@aws cloudformation create-stack --stack-name ${ALB_FRONTEND_STACK_NAME} --template-body file://handson/cloudformations/alb_frontend.yml \
+		--parameters \
+			ParameterKey=SubnetIngressA,ParameterValue=$(SUBNET_INGRESS_A) \
+			ParameterKey=SubnetIngressC,ParameterValue=$(SUBNET_INGRESS_C) \
+			ParameterKey=SecurityGroupId,ParameterValue=$(SG_ID) \
+			ParameterKey=TargetGroupBlueArn,ParameterValue=$(TG_BLUE_ARN) \
+			ParameterKey=TargetGroupGreenArn,ParameterValue=$(TG_GREEN_ARN)
+
+	@echo "${ALB_FRONTEND_STACK_NAME}: 作成中です（約3分かかる）"
+	@time aws cloudformation wait stack-create-complete --stack-name ${ALB_FRONTEND_STACK_NAME}
+
+.PHONY: aws.delete-alb-frontend-cfn
+aws.delete-alb-frontend-cfn: ## フロントエンドアプリのALBを削除
+	@echo 'Before status'
+	@make aws.status
+	@aws cloudformation delete-stack --stack-name $(ALB_FRONTEND_STACK_NAME)
+	@echo '削除中です'
+	@time aws cloudformation wait stack-delete-complete --stack-name $(ALB_FRONTEND_STACK_NAME)
+	@echo 'After status'
+	@make aws.status
+
 .PHONY: aws.create-all-cfns
 aws.create-all-cfns: ## cfnを作成する
 	@make aws.create-base-cfn
@@ -135,9 +158,11 @@ aws.create-all-cfns: ## cfnを作成する
 	@make aws.create-registry-cfn
 	@make aws.create-network-vpc-endpoint-step2-cfn
 	@make aws.create-target-group-frontend-cfn
+	@make aws.create-alb-frontend-cfn
 
 .PHONY: aws.delete-all-cfns
 aws.delete-all-cfns: ## cfnを削除する
+	@make aws.delete-alb-frontend-cfn
 	@make aws.delete-target-group-frontend-cfn
 	@make aws.delete-network-vpc-endpoint-step2-cfn
 	@make aws.delete-registry-cfn
@@ -149,6 +174,15 @@ aws.show-defined-pseudo-cloud9-variables: aws.define-pseudo-cloud9-variables ## 
 	@echo "VPC_ID:     $(VPC_ID)"
 	@echo "SG_ID:      $(SG_ID)"
 	@echo "SUBNET_ID:  $(SUBNET_ID)"
+
+.PHONY: aws.show-defined-alb-frontend-variables
+aws.show-defined-alb-frontend-variables: aws.define-alb-frontend-variables ## ALB CFnスタック作成に必要な環境変数を表示
+	@echo "VPC_ID:               $(VPC_ID)"
+	@echo "SUBNET_INGRESS_A:     $(SUBNET_INGRESS_A)"
+	@echo "SUBNET_INGRESS_C:     $(SUBNET_INGRESS_C)"
+	@echo "SG_ID:                $(SG_ID)"
+	@echo "TG_BLUE_ARN:          $(TG_BLUE_ARN)"
+	@echo "TG_GREEN_ARN:         $(TG_GREEN_ARN)"
 
 .PHONY: aws.show-defined-network-vpc-endpoints-variables
 aws.show-defined-network-vpc-endpoints-variables: aws.define-network-vpc-endpoints-variables ## ECRへのネットワーク経路となる、VPCエンドポイントを作成するための環境変数
@@ -176,6 +210,14 @@ aws.define-pseudo-cloud9-variables:
 
 aws.define-target-group-frontend-variables:
 	$(eval VPC_ID     := $(shell aws ec2 describe-vpcs --filters "Name=tag:Name,Values=sbcntr-main" --query "Vpcs[0].VpcId" --output text))
+
+aws.define-alb-frontend-variables:
+	$(eval VPC_ID               := $(shell aws ec2 describe-vpcs --filters "Name=tag:Name,Values=sbcntr-main" --query "Vpcs[0].VpcId" --output text))
+	$(eval SUBNET_INGRESS_A     := $(shell aws ec2 describe-subnets --filters "Name=tag:Name,Values=sbcntr-public-ingress-a" --query "Subnets[0].SubnetId" --output text))
+	$(eval SUBNET_INGRESS_C     := $(shell aws ec2 describe-subnets --filters "Name=tag:Name,Values=sbcntr-public-ingress-c" --query "Subnets[0].SubnetId" --output text))
+	$(eval SG_ID                := $(shell aws ec2 describe-security-groups --filters "Name=group-name,Values=ingress" "Name=vpc-id,Values=${VPC_ID}" --query "SecurityGroups[0].GroupId" --output text))
+	$(eval TG_BLUE_ARN          := $(shell aws elbv2 describe-target-groups --names sbcntr-frontapp-blue --query "TargetGroups[0].TargetGroupArn" --output text))
+	$(eval TG_GREEN_ARN         := $(shell aws elbv2 describe-target-groups --names sbcntr-frontapp-green --query "TargetGroups[0].TargetGroupArn" --output text))
 
 aws.define-network-vpc-endpoints-variables:
 	$(eval VPC_ID               := $(shell aws ec2 describe-vpcs --filters "Name=tag:Name,Values=sbcntr-main" --query "Vpcs[0].VpcId" --output text))

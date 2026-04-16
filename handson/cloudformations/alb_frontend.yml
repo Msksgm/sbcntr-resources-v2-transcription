@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "ALB for frontend application"
+
+Parameters:
+  SubnetIngressA:
+    Type: AWS::EC2::Subnet::Id
+    Description: "Subnet ID of sbcntr-public-ingress-a"
+  SubnetIngressC:
+    Type: AWS::EC2::Subnet::Id
+    Description: "Subnet ID of sbcntr-public-ingress-c"
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: "Security group ID for ingress"
+  TargetGroupBlueArn:
+    Type: String
+    Description: "ARN of the blue target group"
+  TargetGroupGreenArn:
+    Type: String
+    Description: "ARN of the green target group"
+
+Resources:
+  AlbFrontend:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: sbcntr-ingress
+      Scheme: internet-facing
+      Type: application
+      IpAddressType: ipv4
+      Subnets:
+        - !Ref SubnetIngressA
+        - !Ref SubnetIngressC
+      SecurityGroups:
+        - !Ref SecurityGroupId
+  ListenerHTTP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref AlbFrontend
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn: !Ref TargetGroupBlueArn
+                Weight: 1
+              - TargetGroupArn: !Ref TargetGroupGreenArn
+                Weight: 0
