@@ -169,6 +169,25 @@ aws.delete-iam-role-ecs-bluegreen-cfn: ## Blue/Green デプロイメント用の
 	@echo 'After status'
 	@make aws.status
 
+.PHONY: aws.create-task-definition-frontend-app-cfn
+aws.create-task-definition-frontend-app-cfn: aws.define-task-definition-frontend-app-variables ## フロントエンドアプリのECSタスク定義を作成
+	@aws cloudformation create-stack --stack-name ${TASK_DEF_FRONTEND_APP_STACK_NAME} \
+		--template-body file://handson/cloudformations/task_definition_frontend_app.yml \
+		--parameters \
+			ParameterKey=AccountId,ParameterValue=$(AWS_ACCOUNT_ID)
+	@echo "${TASK_DEF_FRONTEND_APP_STACK_NAME}: 作成中です（約1分かかる）"
+	@time aws cloudformation wait stack-create-complete --stack-name ${TASK_DEF_FRONTEND_APP_STACK_NAME}
+
+.PHONY: aws.delete-task-definition-frontend-app-cfn
+aws.delete-task-definition-frontend-app-cfn: ## フロントエンドアプリのECSタスク定義を削除
+	@echo 'Before status'
+	@make aws.status
+	@aws cloudformation delete-stack --stack-name $(TASK_DEF_FRONTEND_APP_STACK_NAME)
+	@echo '削除中です'
+	@time aws cloudformation wait stack-delete-complete --stack-name $(TASK_DEF_FRONTEND_APP_STACK_NAME)
+	@echo 'After status'
+	@make aws.status
+
 .PHONY: aws.create-all-cfns
 aws.create-all-cfns: ## cfnを作成する
 	@make aws.create-base-cfn
@@ -178,9 +197,11 @@ aws.create-all-cfns: ## cfnを作成する
 	@make aws.create-target-group-frontend-cfn
 	@make aws.create-alb-frontend-cfn
 	@make aws.create-iam-role-ecs-bluegreen-cfn
+	@make aws.create-task-definition-frontend-app-cfn
 
 .PHONY: aws.delete-all-cfns
 aws.delete-all-cfns: ## cfnを削除する
+	@make aws.delete-task-definition-frontend-app-cfn
 	@make aws.delete-iam-role-ecs-bluegreen-cfn
 	@make aws.delete-alb-frontend-cfn
 	@make aws.delete-target-group-frontend-cfn
@@ -203,6 +224,10 @@ aws.show-defined-alb-frontend-variables: aws.define-alb-frontend-variables ## AL
 	@echo "SG_ID:                $(SG_ID)"
 	@echo "TG_BLUE_ARN:          $(TG_BLUE_ARN)"
 	@echo "TG_GREEN_ARN:         $(TG_GREEN_ARN)"
+
+.PHONY: aws.show-defined-task-definition-frontend-app-variables
+aws.show-defined-task-definition-frontend-app-variables: aws.define-task-definition-frontend-app-variables ## フロントエンドアプリのECSタスク定義作成に必要な環境変数を表示
+	@echo "AWS_ACCOUNT_ID:       $(AWS_ACCOUNT_ID)"
 
 .PHONY: aws.show-defined-network-vpc-endpoints-variables
 aws.show-defined-network-vpc-endpoints-variables: aws.define-network-vpc-endpoints-variables ## ECRへのネットワーク経路となる、VPCエンドポイントを作成するための環境変数
@@ -238,6 +263,9 @@ aws.define-alb-frontend-variables:
 	$(eval SG_ID                := $(shell aws ec2 describe-security-groups --filters "Name=group-name,Values=ingress" "Name=vpc-id,Values=${VPC_ID}" --query "SecurityGroups[0].GroupId" --output text))
 	$(eval TG_BLUE_ARN          := $(shell aws elbv2 describe-target-groups --names sbcntr-frontapp-blue --query "TargetGroups[0].TargetGroupArn" --output text))
 	$(eval TG_GREEN_ARN         := $(shell aws elbv2 describe-target-groups --names sbcntr-frontapp-green --query "TargetGroups[0].TargetGroupArn" --output text))
+
+aws.define-task-definition-frontend-app-variables:
+	$(eval AWS_ACCOUNT_ID := $(shell aws configure get sso_account_id --profile $(AWS_SSO_PROFILE)))
 
 aws.define-network-vpc-endpoints-variables:
 	$(eval VPC_ID               := $(shell aws ec2 describe-vpcs --filters "Name=tag:Name,Values=sbcntr-main" --query "Vpcs[0].VpcId" --output text))

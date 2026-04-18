@@ -8,3 +8,9 @@ export AWS_PROFILE=〇〇
 #
 # sshするための公開鍵を取得するのに、 https://github.com/<GITHUB_USERNAME>.keys をcurlする際に使います
 export GITHUB_USERNAME=〇〇
+
+#
+# awsコマンド用（SSO）
+#
+# ACCOUNT_ID を取得するためだけに登録
+export AWS_SSO_PROFILE=〇〇

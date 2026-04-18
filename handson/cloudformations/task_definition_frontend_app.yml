@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS Task Definition for frontend app
+
+Parameters:
+  AccountId:
+    Type: String
+    Description: AWS Account ID
+
+Resources:
+  FrontendAppTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: sbcntr-frontend-app
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      Cpu: '512'
+      Memory: '1024'
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !Sub arn:aws:iam::${AccountId}:role/ecsTaskExecutionRole
+      ContainerDefinitions:
+        - Name: app
+          Essential: true
+          Image: !Sub ${AccountId}.dkr.ecr.ap-northeast-1.amazonaws.com/sbcntr-frontend-app:v1
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          ReadonlyRootFilesystem: true
+          MemoryReservation: 512
+          Environment:
+            - Name: BACKEND_FQDN
+              Value: backend-app.sbcntr.local
+            - Name: BACKEND_PORT
+              Value: '8081'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: /sbcntr/ecs/frontend-app
+              awslogs-region: ap-northeast-1
+              awslogs-stream-prefix: ecs
+              awslogs-create-group: 'true'
