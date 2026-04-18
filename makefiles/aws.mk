@@ -151,6 +151,24 @@ aws.delete-alb-frontend-cfn: ## フロントエンドアプリのALBを削除
 	@echo 'After status'
 	@make aws.status
 
+.PHONY: aws.create-iam-role-ecs-bluegreen-cfn
+aws.create-iam-role-ecs-bluegreen-cfn: ## Blue/Green デプロイメント用のIAMロールを作成
+	@aws cloudformation create-stack --stack-name ${IAM_ROLE_ECS_BLUEGREEN_STACK_NAME} \
+		--template-body file://handson/cloudformations/iam_role_ecs_bluegreen.yml \
+		--capabilities CAPABILITY_NAMED_IAM
+	@echo "${IAM_ROLE_ECS_BLUEGREEN_STACK_NAME}: 作成中です（約1分かかる）"
+	@time aws cloudformation wait stack-create-complete --stack-name ${IAM_ROLE_ECS_BLUEGREEN_STACK_NAME}
+
+.PHONY: aws.delete-iam-role-ecs-bluegreen-cfn
+aws.delete-iam-role-ecs-bluegreen-cfn: ## Blue/Green デプロイメント用のIAMロールを削除
+	@echo 'Before status'
+	@make aws.status
+	@aws cloudformation delete-stack --stack-name $(IAM_ROLE_ECS_BLUEGREEN_STACK_NAME)
+	@echo '削除中です'
+	@time aws cloudformation wait stack-delete-complete --stack-name $(IAM_ROLE_ECS_BLUEGREEN_STACK_NAME)
+	@echo 'After status'
+	@make aws.status
+
 .PHONY: aws.create-all-cfns
 aws.create-all-cfns: ## cfnを作成する
 	@make aws.create-base-cfn
@@ -159,9 +177,11 @@ aws.create-all-cfns: ## cfnを作成する
 	@make aws.create-network-vpc-endpoint-step2-cfn
 	@make aws.create-target-group-frontend-cfn
 	@make aws.create-alb-frontend-cfn
+	@make aws.create-iam-role-ecs-bluegreen-cfn
 
 .PHONY: aws.delete-all-cfns
 aws.delete-all-cfns: ## cfnを削除する
+	@make aws.delete-iam-role-ecs-bluegreen-cfn
 	@make aws.delete-alb-frontend-cfn
 	@make aws.delete-target-group-frontend-cfn
 	@make aws.delete-network-vpc-endpoint-step2-cfn

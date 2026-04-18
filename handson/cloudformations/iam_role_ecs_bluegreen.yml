@@ -1,0 +1,17 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "IAM Role for ECS Blue/Green Deployment with Load Balancers"
+
+Resources:
+  EcsInfrastructureRoleForLoadBalancers:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EcsInfrastructureRoleForLoadBalancers
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Sub "arn:aws:iam::aws:policy/AmazonECSInfrastructureRolePolicyForLoadBalancers"
