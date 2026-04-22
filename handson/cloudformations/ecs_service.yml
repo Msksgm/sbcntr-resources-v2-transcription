@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS Service for frontend app
+
+Parameters:
+  ClusterArn:
+    Type: String
+    Description: ARN of the ECS cluster (sbcntr-app)
+  SubnetAppA:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet ID of sbcntr-private-app-a
+  SubnetAppC:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet ID of sbcntr-private-app-c
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security group ID for sbcntr-frontend-app
+  TaskDefinitionArn:
+    Type: String
+    Description: ARN of the task definition (sbcntr-frontend-app latest revision)
+  TargetGroupBlueArn:
+    Type: String
+    Description: ARN of the blue target group (sbcntr-frontapp-blue)
+  TargetGroupGreenArn:
+    Type: String
+    Description: ARN of the green target group (sbcntr-frontapp-green)
+  ListenerArn:
+    Type: String
+    Description: ARN of the HTTP:80 listener on sbcntr-ingress ALB
+
+Resources:
+  ECSServiceFrontendApp:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: sbcntr-frontend-app
+      Cluster: !Ref ClusterArn
+      TaskDefinition: !Ref TaskDefinitionArn
+      DesiredCount: 1
+      CapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Base: 0
+          Weight: 1
+      PlatformVersion: LATEST
+      SchedulingStrategy: REPLICA
+      HealthCheckGracePeriodSeconds: 60
+      DeploymentController:
+        Type: CODE_DEPLOY
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref SubnetAppA
+            - !Ref SubnetAppC
+          SecurityGroups:
+            - !Ref SecurityGroupId
+      LoadBalancers:
+        - ContainerName: app
+          ContainerPort: 8080
+          TargetGroupArn: !Ref TargetGroupBlueArn

@@ -204,6 +204,32 @@ aws.delete-ecs-cluster-cfn: ## ECSクラスターを削除
 	@echo 'After status'
 	@make aws.status
 
+.PHONY: aws.create-ecs-service-frontend-app-cfn
+aws.create-ecs-service-frontend-app-cfn: aws.define-ecs-service-frontend-app-variables ## フロントエンドアプリのECSサービスを作成
+	@aws cloudformation create-stack --stack-name ${ECS_SERVICE_FRONTEND_APP_STACK_NAME} \
+		--template-body file://handson/cloudformations/ecs_service.yml \
+		--parameters \
+			ParameterKey=ClusterArn,ParameterValue=$(CLUSTER_ARN) \
+			ParameterKey=SubnetAppA,ParameterValue=$(SUBNET_APP_A) \
+			ParameterKey=SubnetAppC,ParameterValue=$(SUBNET_APP_C) \
+			ParameterKey=SecurityGroupId,ParameterValue=$(SG_ID) \
+			ParameterKey=TaskDefinitionArn,ParameterValue=$(TASK_DEF_ARN) \
+			ParameterKey=TargetGroupBlueArn,ParameterValue=$(TG_BLUE_ARN) \
+			ParameterKey=TargetGroupGreenArn,ParameterValue=$(TG_GREEN_ARN) \
+			ParameterKey=ListenerArn,ParameterValue=$(LISTENER_ARN)
+	@echo "${ECS_SERVICE_FRONTEND_APP_STACK_NAME}: 作成中です（約3分かかる）"
+	@time aws cloudformation wait stack-create-complete --stack-name ${ECS_SERVICE_FRONTEND_APP_STACK_NAME}
+
+.PHONY: aws.delete-ecs-service-frontend-app-cfn
+aws.delete-ecs-service-frontend-app-cfn: ## フロントエンドアプリのECSサービスを削除
+	@echo 'Before status'
+	@make aws.status
+	@aws cloudformation delete-stack --stack-name $(ECS_SERVICE_FRONTEND_APP_STACK_NAME)
+	@echo '削除中です'
+	@time aws cloudformation wait stack-delete-complete --stack-name $(ECS_SERVICE_FRONTEND_APP_STACK_NAME)
+	@echo 'After status'
+	@make aws.status
+
 .PHONY: aws.create-all-cfns
 aws.create-all-cfns: ## cfnを作成する
 	@make aws.create-base-cfn
@@ -218,9 +244,11 @@ aws.create-all-cfns: ## cfnを作成する
 	@make aws.create-iam-role-ecs-bluegreen-cfn
 	@make aws.create-task-definition-frontend-app-cfn
 	@make aws.create-ecs-cluster-cfn
+	@make aws.create-ecs-service-frontend-app-cfn
 
 .PHONY: aws.delete-all-cfns
 aws.delete-all-cfns: ## cfnを削除する
+	@make aws.delete-ecs-service-frontend-app-cfn
 	@make aws.delete-ecs-cluster-cfn
 	@make aws.delete-task-definition-frontend-app-cfn
 	@make aws.delete-iam-role-ecs-bluegreen-cfn
@@ -257,6 +285,18 @@ aws.show-defined-network-vpc-endpoints-variables: aws.define-network-vpc-endpoin
 	@echo "SUBNET_IDS:           $(SUBNET_IDS)"
 	@echo "ROUTE_TABLE_ID:       $(ROUTE_TABLE_ID)"
 
+.PHONY: aws.show-defined-ecs-service-frontend-app-variables
+aws.show-defined-ecs-service-frontend-app-variables: aws.define-ecs-service-frontend-app-variables ## フロントエンドアプリのECSサービス作成に必要な環境変数を表示
+	@echo "VPC_ID:               $(VPC_ID)"
+	@echo "SUBNET_APP_A:         $(SUBNET_APP_A)"
+	@echo "SUBNET_APP_C:         $(SUBNET_APP_C)"
+	@echo "SG_ID:                $(SG_ID)"
+	@echo "CLUSTER_ARN:          $(CLUSTER_ARN)"
+	@echo "TASK_DEF_ARN:         $(TASK_DEF_ARN)"
+	@echo "TG_BLUE_ARN:          $(TG_BLUE_ARN)"
+	@echo "TG_GREEN_ARN:         $(TG_GREEN_ARN)"
+	@echo "LISTENER_ARN:         $(LISTENER_ARN)"
+
 ###############################################################################
 # SSHの設定
 ################################################################################
@@ -287,6 +327,17 @@ aws.define-alb-frontend-variables:
 
 aws.define-task-definition-frontend-app-variables:
 	$(eval AWS_ACCOUNT_ID := $(shell aws configure get sso_account_id --profile $(AWS_SSO_PROFILE)))
+
+aws.define-ecs-service-frontend-app-variables:
+	$(eval VPC_ID              := $(shell aws ec2 describe-vpcs --filters "Name=tag:Name,Values=sbcntr-main" --query "Vpcs[0].VpcId" --output text))
+	$(eval SUBNET_APP_A        := $(shell aws ec2 describe-subnets --filters "Name=tag:Name,Values=sbcntr-private-app-a" --query "Subnets[0].SubnetId" --output text))
+	$(eval SUBNET_APP_C        := $(shell aws ec2 describe-subnets --filters "Name=tag:Name,Values=sbcntr-private-app-c" --query "Subnets[0].SubnetId" --output text))
+	$(eval SG_ID               := $(shell aws ec2 describe-security-groups --filters "Name=tag:Name,Values=sbcntr-frontend-app" "Name=vpc-id,Values=${VPC_ID}" --query "SecurityGroups[0].GroupId" --output text))
+	$(eval CLUSTER_ARN         := $(shell aws ecs describe-clusters --clusters sbcntr-app --query "clusters[0].clusterArn" --output text))
+	$(eval TASK_DEF_ARN        := $(shell aws ecs describe-task-definition --task-definition sbcntr-frontend-app --query "taskDefinition.taskDefinitionArn" --output text))
+	$(eval TG_BLUE_ARN         := $(shell aws elbv2 describe-target-groups --names sbcntr-frontapp-blue --query "TargetGroups[0].TargetGroupArn" --output text))
+	$(eval TG_GREEN_ARN        := $(shell aws elbv2 describe-target-groups --names sbcntr-frontapp-green --query "TargetGroups[0].TargetGroupArn" --output text))
+	$(eval LISTENER_ARN        := $(shell aws elbv2 describe-listeners --load-balancer-arn $$(aws elbv2 describe-load-balancers --names sbcntr-ingress --query "LoadBalancers[0].LoadBalancerArn" --output text) --query "Listeners[?Port==\`80\`].ListenerArn | [0]" --output text))
 
 aws.define-network-vpc-endpoints-variables:
 	$(eval VPC_ID               := $(shell aws ec2 describe-vpcs --filters "Name=tag:Name,Values=sbcntr-main" --query "Vpcs[0].VpcId" --output text))
