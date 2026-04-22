@@ -7,7 +7,14 @@ Parameters:
     Description: AWS Account ID
 
 Resources:
+  FrontendAppLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /sbcntr/ecs/frontend-app
+      RetentionInDays: 14
+
   FrontendAppTaskDefinition:
+    DependsOn: FrontendAppLogGroup
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: sbcntr-frontend-app
@@ -40,4 +47,3 @@ Resources:
               awslogs-group: /sbcntr/ecs/frontend-app
               awslogs-region: ap-northeast-1
               awslogs-stream-prefix: ecs
-              awslogs-create-group: 'true'
