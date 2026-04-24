@@ -300,20 +300,23 @@ aws.create-all-cfns: ## cfnを作成する
 	@make aws.create-base-cfn
 	@make aws.create-pseudo-cloud9-cfn
 	@make aws.setup-ssh-config
-	@./scripts/00-setup-pseudo-cloud9.sh
-	@make aws.create-registry-cfn
-	@make aws.create-network-vpc-endpoint-step2-cfn
-	@./scripts/01-build-docker-image-on-pseudo-cloud9.sh
+	@./scripts/00-setup-pseudo-cloud9.sh & \
+	make aws.create-registry-cfn & \
+	make aws.create-network-vpc-endpoint-step2-cfn & \
+	wait; \
+	./scripts/01-build-docker-image-on-pseudo-cloud9.sh
 	@make aws.create-target-group-frontend-cfn
-	@make aws.create-alb-frontend-cfn
-	@make aws.create-iam-role-ecs-bluegreen-cfn
-	@make aws.create-task-definition-frontend-app-cfn
+	@make aws.create-alb-frontend-cfn & \
+	make aws.create-iam-role-ecs-bluegreen-cfn & \
+	wait; \
+	make aws.create-task-definition-frontend-app-cfn
 	@make aws.create-ecs-cluster-cfn
-	@make aws.create-ecs-service-frontend-app-cfn
-	@make aws.create-ecs-service-backend-app-cfn
-	@make aws.create-codedeploy-frontend-cfn
-	@./scripts/02-update-front-app.sh
-	@make aws.update-task-definition-frontend-app-cfn IMAGE_TAG=v1.0.1
+	@make aws.create-ecs-service-frontend-app-cfn & \
+	make aws.create-ecs-service-backend-app-cfn & \
+	make aws.create-codedeploy-frontend-cfn & \
+	./scripts/02-update-front-app.sh & \
+	wait ; \
+	make aws.update-task-definition-frontend-app-cfn IMAGE_TAG=v1.0.1
 	@make aws.deploy-frontend-app
 
 .PHONY: aws.delete-all-cfns

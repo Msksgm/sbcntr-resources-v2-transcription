@@ -44,7 +44,8 @@ ssh -F "$SSH_CONFIG_FILE" "$TARGET_HOST" "touch ~/.hushlogin" 2>&1 || {
   exit 0
 }
 
-build_and_push_backend_app
-build_and_push_frontend_app
+build_and_push_backend_app &
+build_and_push_frontend_app &
+wait
 
 end_timer "$@"
