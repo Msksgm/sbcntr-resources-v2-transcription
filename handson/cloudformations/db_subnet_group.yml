@@ -1,0 +1,20 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "DB subnet group for Aurora"
+
+Parameters:
+  SubnetDbA:
+    Type: AWS::EC2::Subnet::Id
+    Description: "ID of the DB subnet in AZ-a"
+  SubnetDbC:
+    Type: AWS::EC2::Subnet::Id
+    Description: "ID of the DB subnet in AZ-c"
+
+Resources:
+  SbcntrDbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: sbcntr-main
+      DBSubnetGroupDescription: "DB subnet group for Aurora"
+      SubnetIds:
+        - !Ref SubnetDbA
+        - !Ref SubnetDbC
