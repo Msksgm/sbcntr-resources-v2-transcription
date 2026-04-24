@@ -178,6 +178,48 @@ aws.create-task-definition-frontend-app-cfn: aws.define-task-definition-frontend
 	@echo "${TASK_DEF_FRONTEND_APP_STACK_NAME}: 作成中です（約1分かかる）"
 	@time aws cloudformation wait stack-create-complete --stack-name ${TASK_DEF_FRONTEND_APP_STACK_NAME}
 
+.PHONY: aws.update-task-definition-frontend-app-cfn
+aws.update-task-definition-frontend-app-cfn: aws.define-task-definition-frontend-app-variables ## フロントエンドアプリのECSタスク定義を更新
+	@aws cloudformation update-stack --stack-name ${TASK_DEF_FRONTEND_APP_STACK_NAME} \
+		--template-body file://handson/cloudformations/task_definition_frontend_app.yml \
+		--parameters \
+			ParameterKey=AccountId,ParameterValue=$(AWS_ACCOUNT_ID) \
+			ParameterKey=ImageTag,ParameterValue=$(IMAGE_TAG)
+	@echo "${TASK_DEF_FRONTEND_APP_STACK_NAME}: 更新中です"
+	@time aws cloudformation wait stack-update-complete --stack-name ${TASK_DEF_FRONTEND_APP_STACK_NAME}
+
+.PHONY: aws.create-codedeploy-frontend-cfn
+aws.create-codedeploy-frontend-cfn: aws.define-codedeploy-frontend-variables ## フロントエンドアプリのCodeDeployリソースを作成
+	@aws cloudformation create-stack --stack-name ${CODEDEPLOY_FRONTEND_STACK_NAME} \
+		--template-body file://handson/cloudformations/codedeploy_frontend.yml \
+		--capabilities CAPABILITY_NAMED_IAM \
+		--parameters \
+			ParameterKey=ListenerArn,ParameterValue=$(LISTENER_ARN)
+	@echo "${CODEDEPLOY_FRONTEND_STACK_NAME}: 作成中です（約1分かかる）"
+	@time aws cloudformation wait stack-create-complete --stack-name ${CODEDEPLOY_FRONTEND_STACK_NAME}
+
+.PHONY: aws.delete-codedeploy-frontend-cfn
+aws.delete-codedeploy-frontend-cfn: ## フロントエンドアプリのCodeDeployリソースを削除
+	@echo 'Before status'
+	@make aws.status
+	@aws cloudformation delete-stack --stack-name $(CODEDEPLOY_FRONTEND_STACK_NAME)
+	@echo '削除中です'
+	@time aws cloudformation wait stack-delete-complete --stack-name $(CODEDEPLOY_FRONTEND_STACK_NAME)
+	@echo 'After status'
+	@make aws.status
+
+.PHONY: aws.deploy-frontend-app
+aws.deploy-frontend-app: aws.define-deploy-frontend-app-variables ## フロントエンドアプリをCodeDeployでBlue/Greenデプロイ（書籍にはない内容）
+	@echo "デプロイ対象タスク定義: $(TASK_DEF_ARN)"
+	$(eval DEPLOYMENT_ID := $(shell aws deploy create-deployment \
+		--application-name sbcntr-frontend-app \
+		--deployment-group-name sbcntr-frontend-app-dg \
+		--revision '{"revisionType":"AppSpecContent","appSpecContent":{"content":"{\"version\":0.0,\"Resources\":[{\"TargetService\":{\"Type\":\"AWS::ECS::Service\",\"Properties\":{\"TaskDefinition\":\"$(TASK_DEF_ARN)\",\"LoadBalancerInfo\":{\"ContainerName\":\"app\",\"ContainerPort\":8080}}}}]}"}}' \
+		--query 'deploymentId' --output text))
+	@echo "デプロイ開始: $(DEPLOYMENT_ID)"
+	@time aws deploy wait deployment-successful --deployment-id $(DEPLOYMENT_ID)
+	@echo "デプロイ完了: $(DEPLOYMENT_ID)"
+
 .PHONY: aws.delete-task-definition-frontend-app-cfn
 aws.delete-task-definition-frontend-app-cfn: ## フロントエンドアプリのECSタスク定義を削除
 	@echo 'Before status'
@@ -269,9 +311,14 @@ aws.create-all-cfns: ## cfnを作成する
 	@make aws.create-ecs-cluster-cfn
 	@make aws.create-ecs-service-frontend-app-cfn
 	@make aws.create-ecs-service-backend-app-cfn
+	@make aws.create-codedeploy-frontend-cfn
+	@./scripts/02-update-front-app.sh
+	@make aws.update-task-definition-frontend-app-cfn IMAGE_TAG=v1.0.1
+	@make aws.deploy-frontend-app
 
 .PHONY: aws.delete-all-cfns
 aws.delete-all-cfns: ## cfnを削除する
+	@make aws.delete-codedeploy-frontend-cfn
 	@make aws.delete-ecs-service-backend-app-cfn
 	@make aws.delete-ecs-service-frontend-app-cfn
 	@make aws.delete-ecs-cluster-cfn
@@ -298,6 +345,14 @@ aws.show-defined-alb-frontend-variables: aws.define-alb-frontend-variables ## AL
 	@echo "SG_ID:                $(SG_ID)"
 	@echo "TG_BLUE_ARN:          $(TG_BLUE_ARN)"
 	@echo "TG_GREEN_ARN:         $(TG_GREEN_ARN)"
+
+.PHONY: aws.show-defined-codedeploy-frontend-variables
+aws.show-defined-codedeploy-frontend-variables: aws.define-codedeploy-frontend-variables ## CodeDeployフロントエンド作成に必要な環境変数を表示
+	@echo "LISTENER_ARN:         $(LISTENER_ARN)"
+
+.PHONY: aws.show-defined-deploy-frontend-app-variables
+aws.show-defined-deploy-frontend-app-variables: aws.define-deploy-frontend-app-variables ## フロントエンドアプリのデプロイに必要な環境変数を表示
+	@echo "TASK_DEF_ARN:         $(TASK_DEF_ARN)"
 
 .PHONY: aws.show-defined-task-definition-frontend-app-variables
 aws.show-defined-task-definition-frontend-app-variables: aws.define-task-definition-frontend-app-variables ## フロントエンドアプリのECSタスク定義作成に必要な環境変数を表示
@@ -357,6 +412,12 @@ aws.define-alb-frontend-variables:
 	$(eval SG_ID                := $(shell aws ec2 describe-security-groups --filters "Name=group-name,Values=ingress" "Name=vpc-id,Values=${VPC_ID}" --query "SecurityGroups[0].GroupId" --output text))
 	$(eval TG_BLUE_ARN          := $(shell aws elbv2 describe-target-groups --names sbcntr-frontapp-blue --query "TargetGroups[0].TargetGroupArn" --output text))
 	$(eval TG_GREEN_ARN         := $(shell aws elbv2 describe-target-groups --names sbcntr-frontapp-green --query "TargetGroups[0].TargetGroupArn" --output text))
+
+aws.define-codedeploy-frontend-variables:
+	$(eval LISTENER_ARN        := $(shell aws elbv2 describe-listeners --load-balancer-arn $$(aws elbv2 describe-load-balancers --names sbcntr-ingress --query "LoadBalancers[0].LoadBalancerArn" --output text) --query "Listeners[?Port==\`80\`].ListenerArn | [0]" --output text))
+
+aws.define-deploy-frontend-app-variables:
+	$(eval TASK_DEF_ARN        := $(shell aws ecs describe-task-definition --task-definition sbcntr-frontend-app --query "taskDefinition.taskDefinitionArn" --output text))
 
 aws.define-task-definition-frontend-app-variables:
 	$(eval AWS_ACCOUNT_ID := $(shell aws configure get sso_account_id --profile $(AWS_SSO_PROFILE)))

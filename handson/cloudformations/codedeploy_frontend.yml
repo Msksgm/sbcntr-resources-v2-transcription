@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CodeDeploy Application and Deployment Group for frontend Blue/Green deployment"
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: sbcntr-app
+    Description: ECS cluster name
+  ServiceName:
+    Type: String
+    Default: sbcntr-frontend-app
+    Description: ECS service name
+  TargetGroupBlueName:
+    Type: String
+    Default: sbcntr-frontapp-blue
+    Description: Blue target group name
+  TargetGroupGreenName:
+    Type: String
+    Default: sbcntr-frontapp-green
+    Description: Green target group name
+  ListenerArn:
+    Type: String
+    Description: ARN of the HTTP:80 listener on sbcntr-ingress ALB
+
+Resources:
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: sbcntr-codedeploy-service-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodeDeployRoleForECS
+
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: sbcntr-frontend-app
+      ComputePlatform: ECS
+
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    DependsOn:
+      - CodeDeployApplication
+      - CodeDeployServiceRole
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: sbcntr-frontend-app-dg
+      DeploymentConfigName: CodeDeployDefault.ECSAllAtOnce
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
+      DeploymentStyle:
+        DeploymentType: BLUE_GREEN
+        DeploymentOption: WITH_TRAFFIC_CONTROL
+      BlueGreenDeploymentConfiguration:
+        TerminateBlueInstancesOnDeploymentSuccess:
+          Action: TERMINATE
+          TerminationWaitTimeInMinutes: 5
+        DeploymentReadyOption:
+          ActionOnTimeout: CONTINUE_DEPLOYMENT
+      ECSServices:
+        - ClusterName: !Ref ClusterName
+          ServiceName: !Ref ServiceName
+      LoadBalancerInfo:
+        TargetGroupPairInfoList:
+          - TargetGroups:
+              - Name: !Ref TargetGroupBlueName
+              - Name: !Ref TargetGroupGreenName
+            ProdTrafficRoute:
+              ListenerArns:
+                - !Ref ListenerArn
+      AutoRollbackConfiguration:
+        Enabled: true
+        Events:
+          - DEPLOYMENT_FAILURE

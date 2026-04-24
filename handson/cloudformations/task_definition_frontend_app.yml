@@ -5,6 +5,10 @@ Parameters:
   AccountId:
     Type: String
     Description: AWS Account ID
+  ImageTag:
+    Type: String
+    Default: v1
+    Description: Container image tag
 
 Resources:
   FrontendAppLogGroup:
@@ -30,7 +34,7 @@ Resources:
       ContainerDefinitions:
         - Name: app
           Essential: true
-          Image: !Sub ${AccountId}.dkr.ecr.ap-northeast-1.amazonaws.com/sbcntr-frontend-app:v1
+          Image: !Sub ${AccountId}.dkr.ecr.ap-northeast-1.amazonaws.com/sbcntr-frontend-app:${ImageTag}
           PortMappings:
             - ContainerPort: 8080
               Protocol: tcp
